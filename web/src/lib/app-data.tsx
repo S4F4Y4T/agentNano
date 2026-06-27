@@ -16,7 +16,8 @@ import type {
   ProviderType,
   Session,
 } from "./types";
-import { api } from "./api";
+import { api, ApiError } from "./api";
+import { genId } from "./id";
 
 interface AgentConfigInput {
   providerType: ProviderType;
@@ -190,25 +191,84 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
 
   const sendMessage = useCallback(
     async (conversationId: string, content: string, attachments: Attachment[]) => {
-      const res = await api.post<{ message: Message; reply: Message }>(
-        `/conversations/${conversationId}/messages`,
-        { content, attachmentIds: attachments.map((a) => a.id) }
-      );
-      setMessagesByConversation((prev) => ({
-        ...prev,
-        [conversationId]: [...(prev[conversationId] ?? []), res.message, res.reply],
-      }));
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === conversationId
-            ? {
-                ...c,
-                lastMessageAt: res.reply.createdAt,
-                title: c.title === "New chat" ? content.slice(0, 60) : c.title,
-              }
-            : c
-        )
-      );
+      const res = await fetch(`/api/conversations/${conversationId}/messages`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, attachmentIds: attachments.map((a) => a.id) }),
+      });
+
+      if (!res.ok || !res.body) {
+        let message = res.statusText;
+        try {
+          message = (await res.json()).error ?? message;
+        } catch {
+          // ignore non-JSON error bodies
+        }
+        throw new ApiError(message, res.status);
+      }
+
+      const draftReplyId = genId("msg");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const chunks = buffer.split("\n\n");
+        buffer = chunks.pop() ?? "";
+
+        for (const chunk of chunks) {
+          const line = chunk.trim();
+          if (!line.startsWith("data:")) continue;
+          const event = JSON.parse(line.slice(5).trim());
+
+          if (event.type === "user_message") {
+            const message: Message = event.message;
+            const draftReply: Message = {
+              id: draftReplyId,
+              conversationId,
+              role: "assistant",
+              content: "",
+              streaming: true,
+              createdAt: new Date().toISOString(),
+            };
+            setMessagesByConversation((prev) => ({
+              ...prev,
+              [conversationId]: [...(prev[conversationId] ?? []), message, draftReply],
+            }));
+          } else if (event.type === "token") {
+            setMessagesByConversation((prev) => ({
+              ...prev,
+              [conversationId]: (prev[conversationId] ?? []).map((m) =>
+                m.id === draftReplyId ? { ...m, content: m.content + event.token } : m
+              ),
+            }));
+          } else if (event.type === "done") {
+            const reply: Message = event.reply;
+            setMessagesByConversation((prev) => ({
+              ...prev,
+              [conversationId]: (prev[conversationId] ?? []).map((m) =>
+                m.id === draftReplyId ? reply : m
+              ),
+            }));
+            setConversations((prev) =>
+              prev.map((c) =>
+                c.id === conversationId
+                  ? {
+                      ...c,
+                      lastMessageAt: reply.createdAt,
+                      title: c.title === "New chat" ? content.slice(0, 60) : c.title,
+                    }
+                  : c
+              )
+            );
+          }
+        }
+      }
     },
     []
   );

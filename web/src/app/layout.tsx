@@ -37,7 +37,7 @@ export default function RootLayout({
       className={`${inter.variable} ${jakarta.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
+      <body className="h-full flex flex-col overflow-hidden">
         <ThemeProvider
           attribute="class"
           defaultTheme="light"

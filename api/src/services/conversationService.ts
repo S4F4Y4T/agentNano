@@ -117,16 +117,16 @@ export async function listMessages(
   return messages.map(serializeMessage);
 }
 
-export interface SendMessageResult {
-  message: PublicMessage;
-  reply: PublicMessage;
+export interface PreparedMessage {
+  userMessage: PublicMessage;
+  streamReply: (onToken: (token: string) => void) => Promise<PublicMessage>;
 }
 
 export async function sendMessage(
   userId: string,
   conversationId: string,
   input: { content: string; attachmentIds: string[] }
-): Promise<SendMessageResult> {
+): Promise<PreparedMessage> {
   const conversation = await findOwnedConversation(userId, conversationId);
 
   const agentConfig = await AgentConfig.findOne({ userId });
@@ -169,29 +169,36 @@ export async function sendMessage(
     .slice(-40)
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
-  let replyContent: string;
-  try {
-    replyContent = await answerMessage(
-      {
-        providerType: agentConfig.providerType,
-        baseUrl: agentConfig.baseUrl,
-        apiKey: decryptSecret(agentConfig.apiKeyEncrypted),
-        model: agentConfig.model,
-      },
-      agentConfig.systemPrompt,
-      history
-    );
-  } catch {
-    replyContent = "Couldn't reach the provider. Check the API key and try again.";
-  }
+  return {
+    userMessage: serializeMessage(userMessage),
+    streamReply: async (onToken) => {
+      let replyContent = "";
+      try {
+        replyContent = await answerMessage(
+          {
+            providerType: agentConfig.providerType,
+            baseUrl: agentConfig.baseUrl,
+            apiKey: decryptSecret(agentConfig.apiKeyEncrypted),
+            model: agentConfig.model,
+          },
+          agentConfig.systemPrompt,
+          history,
+          onToken
+        );
+      } catch {
+        replyContent = "Couldn't reach the provider. Check the API key and try again.";
+        onToken(replyContent);
+      }
 
-  const assistantMessage = await Message.create({
-    conversationId,
-    role: "assistant",
-    content: replyContent,
-  });
-  conversation.lastMessageAt = new Date();
-  await conversation.save();
+      const assistantMessage = await Message.create({
+        conversationId,
+        role: "assistant",
+        content: replyContent,
+      });
+      conversation.lastMessageAt = new Date();
+      await conversation.save();
 
-  return { message: serializeMessage(userMessage), reply: serializeMessage(assistantMessage) };
+      return serializeMessage(assistantMessage);
+    },
+  };
 }

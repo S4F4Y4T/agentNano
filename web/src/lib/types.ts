@@ -40,6 +40,7 @@ export interface Message {
   conversationId: string;
   role: MessageRole;
   content: string;
+  streaming?: boolean;
   attachments?: Attachment[];
   createdAt: string;
 }

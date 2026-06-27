@@ -77,7 +77,7 @@ export default function ChatConversationPage() {
   };
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex items-center justify-between border-b border-border px-6 py-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{conversation.title}</p>
@@ -98,7 +98,7 @@ export default function ChatConversationPage() {
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
             <AgentNanoLogo iconOnly className="scale-150" />

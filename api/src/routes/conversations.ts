@@ -55,7 +55,21 @@ export async function conversationsRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: "Invalid input", details: parsed.error.flatten() });
     }
 
-    const result = await sendMessage(request.userId!, id, parsed.data);
-    return reply.code(201).send(result);
+    const prepared = await sendMessage(request.userId!, id, parsed.data);
+
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+    });
+
+    const send = (event: unknown) => reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
+
+    send({ type: "user_message", message: prepared.userMessage });
+    const assistantMessage = await prepared.streamReply((token) => send({ type: "token", token }));
+    send({ type: "done", reply: assistantMessage });
+
+    reply.raw.end();
   });
 }

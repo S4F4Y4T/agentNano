@@ -48,6 +48,14 @@ export function MessageItem({
           </div>
         )}
 
+        {!isUser && message.streaming && (
+          <div className="flex items-center gap-1 py-1" aria-label={`${agentName} is thinking`}>
+            <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.3s]" />
+            <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.15s]" />
+            <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60" />
+          </div>
+        )}
+
         {message.content ? <Markdown content={message.content} /> : null}
       </div>
     </div>

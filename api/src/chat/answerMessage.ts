@@ -9,7 +9,8 @@ export interface ChatHistoryItem {
 export async function answerMessage(
   config: ModelConfig,
   systemPrompt: string,
-  history: ChatHistoryItem[]
+  history: ChatHistoryItem[],
+  onToken: (token: string) => void
 ): Promise<string> {
   const model = buildChatModel(config);
 
@@ -29,8 +30,15 @@ export async function answerMessage(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 60_000);
   try {
-    const response = await model.invoke(messages, { signal: controller.signal });
-    return typeof response.content === "string" ? response.content : JSON.stringify(response.content);
+    const stream = await model.stream(messages, { signal: controller.signal });
+    let full = "";
+    for await (const chunk of stream) {
+      const token = typeof chunk.content === "string" ? chunk.content : JSON.stringify(chunk.content);
+      if (!token) continue;
+      full += token;
+      onToken(token);
+    }
+    return full;
   } finally {
     clearTimeout(timeout);
   }
