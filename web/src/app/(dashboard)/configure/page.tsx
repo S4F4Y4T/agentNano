@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Loader2, Zap } from "lucide-react";
+import { ChevronsUpDown, Loader2, RefreshCw, Zap } from "lucide-react";
 import { useAppData } from "@/lib/app-data";
 import { formatRelativeTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,13 +20,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { StatusPill } from "@/components/dashboard/status-pill";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  PROVIDER_BASE_URLS,
-  PROVIDER_LABELS,
-  PROVIDER_MODEL_PLACEHOLDERS,
-  type ProviderType,
-} from "@/lib/types";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { StatusPill } from "@/components/dashboard/status-pill";
+import { PROVIDER_BASE_URLS, PROVIDER_LABELS, type ProviderType } from "@/lib/types";
 
 const configSchema = z.object({
   providerType: z.enum(["openai", "gemini", "openrouter", "custom"]),
@@ -37,8 +42,14 @@ const configSchema = z.object({
 
 type ConfigValues = z.infer<typeof configSchema>;
 
+function withCurrent(options: string[], current?: string): string[] {
+  if (current && !options.includes(current)) return [current, ...options];
+  return options;
+}
+
 export default function ConfigurePage() {
-  const { agentConfig, saveAgentConfig, testAgentConnection } = useAppData();
+  const { agentConfig, saveAgentConfig, testAgentConnection, fetchProviderModels } =
+    useAppData();
   const isFirstSetup = !agentConfig;
 
   const baseSchema = isFirstSetup
@@ -54,6 +65,7 @@ export default function ConfigurePage() {
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<ConfigValues>({
     resolver: zodResolver(baseSchema),
@@ -74,15 +86,69 @@ export default function ConfigurePage() {
         },
   });
 
+  const [modelOptions, setModelOptions] = useState<string[]>(() =>
+    agentConfig?.model ? [agentConfig.model] : []
+  );
+  const [modelOpen, setModelOpen] = useState(false);
+  const [modelSearch, setModelSearch] = useState("");
+  const [fetchingModels, setFetchingModels] = useState(false);
+
   useEffect(() => {
     document.title = "Configure — AgentNano";
   }, []);
 
   const providerType = watch("providerType");
 
+  const handleFetchModels = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      setFetchingModels(true);
+      try {
+        const models = await fetchProviderModels({
+          providerType: watch("providerType"),
+          baseUrl: watch("baseUrl"),
+          apiKey: watch("apiKey") || undefined,
+        });
+        if (!models.length) {
+          if (!opts?.silent) toast.error("The provider returned no models");
+          return;
+        }
+        setModelOptions(withCurrent(models, watch("model")));
+        if (!opts?.silent) {
+          toast.success(`Found ${models.length} model${models.length === 1 ? "" : "s"}`);
+        }
+      } catch (err) {
+        if (!opts?.silent) {
+          toast.error(err instanceof Error ? err.message : "Couldn't fetch model list");
+        }
+      } finally {
+        setFetchingModels(false);
+      }
+    },
+    [fetchProviderModels, watch]
+  );
+
+  // `agentConfig` loads asynchronously from the API, so on a hard refresh it's
+  // still null when this form mounts and `defaultValues` capture empty fields.
+  // Once it actually arrives, hydrate the form for real (once) and kick off a
+  // silent live model fetch using the key that's already stored on the server.
+  const hasHydratedRef = useRef(false);
+  useEffect(() => {
+    if (!agentConfig || hasHydratedRef.current) return;
+    hasHydratedRef.current = true;
+    reset({
+      providerType: agentConfig.providerType,
+      baseUrl: agentConfig.baseUrl,
+      apiKey: "",
+      model: agentConfig.model,
+      systemPrompt: agentConfig.systemPrompt,
+    });
+    setModelOptions(agentConfig.model ? [agentConfig.model] : []);
+    handleFetchModels({ silent: true });
+  }, [agentConfig, reset, handleFetchModels]);
+
   const onSubmit = async (values: ConfigValues) => {
     try {
-      await saveAgentConfig(values);
+      await saveAgentConfig({ ...values, apiKey: values.apiKey || undefined });
       toast.success(isFirstSetup ? "Agent configured" : "Agent configuration saved");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't save agent configuration");
@@ -96,6 +162,12 @@ export default function ConfigurePage() {
       error: "Couldn't reach the provider",
     });
   };
+
+  const filteredModelOptions = modelOptions.filter((m) =>
+    m.toLowerCase().includes(modelSearch.trim().toLowerCase())
+  );
+  const trimmedSearch = modelSearch.trim();
+  const canCreateFromSearch = trimmedSearch.length > 0 && !modelOptions.includes(trimmedSearch);
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -152,7 +224,9 @@ export default function ConfigurePage() {
                       if (!value) return;
                       field.onChange(value);
                       setValue("baseUrl", PROVIDER_BASE_URLS[value]);
-                      setValue("model", PROVIDER_MODEL_PLACEHOLDERS[value]);
+                      setValue("model", "");
+                      setModelOptions([]);
+                      setModelSearch("");
                     }}
                   >
                     <SelectTrigger className="w-full">
@@ -171,8 +245,8 @@ export default function ConfigurePage() {
                 )}
               />
               <p className="text-xs text-muted-foreground">
-                Base URL and a default model are filled in automatically — switch
-                providers any time to update them.
+                Base URL is filled in automatically. Enter your API key, then fetch the
+                live model list for this provider.
               </p>
             </div>
 
@@ -190,7 +264,93 @@ export default function ConfigurePage() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="model">Model</Label>
-                <Input id="model" {...register("model")} />
+                <div className="flex gap-1.5">
+                  <Controller
+                    control={control}
+                    name="model"
+                    render={({ field }) => (
+                      <Popover open={modelOpen} onOpenChange={setModelOpen}>
+                        <PopoverTrigger
+                          render={
+                            <Button
+                              id="model"
+                              type="button"
+                              variant="outline"
+                              className="w-full min-w-0 flex-1 justify-between font-normal"
+                            />
+                          }
+                        >
+                          <span className={cn("truncate", !field.value && "text-muted-foreground")}>
+                            {field.value || "Fetch or type a model"}
+                          </span>
+                          <ChevronsUpDown className="size-3.5 shrink-0 opacity-50" />
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-[var(--anchor-width)] p-0"
+                          align="start"
+                        >
+                          <Command shouldFilter={false}>
+                            <CommandInput
+                              placeholder="Search or type a model id…"
+                              value={modelSearch}
+                              onValueChange={setModelSearch}
+                            />
+                            <CommandList>
+                              <CommandEmpty className="px-3 py-2 text-xs text-muted-foreground">
+                                {modelOptions.length
+                                  ? "No matching models."
+                                  : "No models fetched yet — type to enter one manually."}
+                              </CommandEmpty>
+                              <CommandGroup>
+                                {filteredModelOptions.map((m) => (
+                                  <CommandItem
+                                    key={m}
+                                    value={m}
+                                    onSelect={() => {
+                                      field.onChange(m);
+                                      setModelOpen(false);
+                                      setModelSearch("");
+                                    }}
+                                  >
+                                    {m}
+                                  </CommandItem>
+                                ))}
+                                {canCreateFromSearch && (
+                                  <CommandItem
+                                    value={trimmedSearch}
+                                    onSelect={() => {
+                                      field.onChange(trimmedSearch);
+                                      setModelOpen(false);
+                                      setModelSearch("");
+                                    }}
+                                  >
+                                    Use &ldquo;{trimmedSearch}&rdquo;
+                                  </CommandItem>
+                                )}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    onClick={() => handleFetchModels()}
+                    disabled={fetchingModels}
+                    aria-label="Fetch model list"
+                    title="Fetch model list from provider"
+                  >
+                    {fetchingModels ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="size-3.5" />
+                    )}
+                  </Button>
+                </div>
                 {errors.model && (
                   <p className="text-xs text-destructive">{errors.model.message}</p>
                 )}

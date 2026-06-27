@@ -14,13 +14,6 @@ export const PROVIDER_BASE_URLS: Record<ProviderType, string> = {
   custom: "",
 };
 
-export const PROVIDER_MODEL_PLACEHOLDERS: Record<ProviderType, string> = {
-  openai: "gpt-4.1",
-  gemini: "gemini-2.5-pro",
-  openrouter: "anthropic/claude-sonnet-4.6",
-  custom: "llama-3.3-70b",
-};
-
 export type AgentConfigStatus = "connected" | "untested" | "error";
 
 export interface AgentConfig {

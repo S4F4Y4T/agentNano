@@ -1,4 +1,5 @@
 import { HumanMessage } from "@langchain/core/messages";
+import OpenAI from "openai";
 import { AgentConfig, type ProviderType } from "../db/models/AgentConfig.js";
 import { encryptSecret, decryptSecret, maskApiKey } from "../utils/crypto.js";
 import { buildChatModel } from "../chat/modelFactory.js";
@@ -72,6 +73,62 @@ export async function saveAgentConfig(
   );
 
   return toPublic(saved);
+}
+
+export async function listProviderModels(
+  userId: string,
+  input: { providerType: ProviderType; baseUrl: string; apiKey?: string }
+): Promise<string[]> {
+  let apiKey = input.apiKey;
+  if (!apiKey) {
+    const existing = await AgentConfig.findOne({ userId });
+    if (existing) apiKey = decryptSecret(existing.apiKeyEncrypted);
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+
+  try {
+    if (input.providerType === "gemini") {
+      if (!apiKey) {
+        throw new HttpError(400, "An API key is required to list Gemini models");
+      }
+      // The installed Gemini SDK (@google/generative-ai) has no models.list()
+      // call, so this hits Google's REST endpoint directly.
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${encodeURIComponent(apiKey)}`,
+        { signal: controller.signal }
+      );
+      if (!res.ok) {
+        throw new HttpError(502, "The provider rejected the model list request");
+      }
+      const data = (await res.json()) as {
+        models?: { name: string; supportedGenerationMethods?: string[] }[];
+      };
+      return (data.models ?? [])
+        .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+        .map((m) => m.name.replace(/^models\//, ""))
+        .sort();
+    }
+
+    // openai / openrouter / custom are all OpenAI-compatible APIs, so the
+    // official `openai` SDK's models.list() works against any of them.
+    const baseUrl = input.baseUrl.replace(/\/+$/, "");
+    if (!baseUrl) {
+      throw new HttpError(400, "A base URL is required to list models");
+    }
+    const client = new OpenAI({ apiKey: apiKey ?? "", baseURL: baseUrl });
+    const page = await client.models.list({ signal: controller.signal });
+    return page.data.map((m) => m.id).sort();
+  } catch (err) {
+    if (err instanceof HttpError) throw err;
+    if (err instanceof OpenAI.APIError) {
+      throw new HttpError(502, err.message || "The provider rejected the model list request");
+    }
+    throw new HttpError(502, "Couldn't reach the provider to list models");
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function testAgentConnection(userId: string): Promise<boolean> {

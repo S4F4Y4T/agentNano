@@ -36,6 +36,11 @@ interface AppDataContextValue {
   agentConfig: AgentConfig | null;
   saveAgentConfig: (input: AgentConfigInput) => Promise<void>;
   testAgentConnection: () => Promise<boolean>;
+  fetchProviderModels: (input: {
+    providerType: ProviderType;
+    baseUrl: string;
+    apiKey?: string;
+  }) => Promise<string[]>;
 
   conversations: Conversation[];
   conversationsLoaded: boolean;
@@ -128,6 +133,14 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     return res.success;
   }, []);
 
+  const fetchProviderModels = useCallback(
+    async (input: { providerType: ProviderType; baseUrl: string; apiKey?: string }) => {
+      const res = await api.post<{ models: string[] }>("/agent-config/models", input);
+      return res.models;
+    },
+    []
+  );
+
   const createConversation = useCallback(async () => {
     const res = await api.post<{ conversation: Conversation }>("/conversations");
     setConversations((prev) => [res.conversation, ...prev]);
@@ -211,6 +224,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         agentConfig,
         saveAgentConfig,
         testAgentConnection,
+        fetchProviderModels,
         conversations,
         conversationsLoaded,
         messagesByConversation,
