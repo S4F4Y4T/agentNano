@@ -16,7 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAppData } from "@/lib/app-data";
 import { formatRelativeTime } from "@/lib/format";
-import { DeskAgentLogo } from "@/components/deskagent-logo";
+import { AgentNanoLogo } from "@/components/agentnano-logo";
 import { UserMenu } from "@/components/dashboard/user-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,7 +78,7 @@ export function Sidebar() {
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
       <div className="flex items-center px-3 py-3">
-        <DeskAgentLogo />
+        <AgentNanoLogo />
       </div>
 
       <nav className="flex flex-col gap-0.5 px-2">

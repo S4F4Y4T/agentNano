@@ -70,12 +70,12 @@ export default function ConfigurePage() {
           baseUrl: PROVIDER_BASE_URLS.openai,
           apiKey: "",
           model: "",
-          systemPrompt: "You are DeskAgent, a helpful desk companion. Be concise and clear.",
+          systemPrompt: "You are AgentNano, a helpful desk companion. Be concise and clear.",
         },
   });
 
   useEffect(() => {
-    document.title = "Configure — DeskAgent";
+    document.title = "Configure — AgentNano";
   }, []);
 
   const providerType = watch("providerType");
@@ -103,7 +103,7 @@ export default function ConfigurePage() {
         <div>
           <h1 className="font-heading text-xl font-bold">Configure your agent</h1>
           <p className="text-sm text-muted-foreground">
-            Connect a provider, define how DeskAgent behaves, and start chatting.
+            Connect a provider, define how AgentNano behaves, and start chatting.
           </p>
         </div>
 

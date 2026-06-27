@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DeskAgentLogo } from "@/components/deskagent-logo";
+import { AgentNanoLogo } from "@/components/agentnano-logo";
 import { useAppData } from "@/lib/app-data";
 import { ApiError } from "@/lib/api";
 
@@ -49,7 +49,7 @@ export default function RegisterPage() {
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col items-center gap-3">
-        <DeskAgentLogo />
+        <AgentNanoLogo />
         <p className="text-sm text-muted-foreground">
           Create your account.
         </p>

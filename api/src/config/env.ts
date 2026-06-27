@@ -6,7 +6,7 @@ const envSchema = z.object({
   WEB_ORIGIN: z.string().default("http://localhost:3000"),
   MONGODB_URI: z.string().min(1),
   JWT_SECRET: z.string().min(16),
-  COOKIE_NAME: z.string().default("deskagent_session"),
+  COOKIE_NAME: z.string().default("agentnano_session"),
   MASTER_ENCRYPTION_KEY: z
     .string()
     .length(64, "MASTER_ENCRYPTION_KEY must be a 64-char hex string (32 bytes)"),

@@ -4,7 +4,7 @@ import { Paperclip } from "lucide-react";
 import { useAppData } from "@/lib/app-data";
 import { formatBytes } from "@/lib/format";
 import { Markdown } from "@/components/dashboard/markdown";
-import { DeskAgentLogo } from "@/components/deskagent-logo";
+import { AgentNanoLogo } from "@/components/agentnano-logo";
 import type { Message } from "@/lib/types";
 
 export function MessageItem({
@@ -25,7 +25,7 @@ export function MessageItem({
             {session?.name?.[0]?.toUpperCase() ?? "U"}
           </span>
         ) : (
-          <DeskAgentLogo iconOnly />
+          <AgentNanoLogo iconOnly />
         )}
       </div>
       <div className="min-w-0 flex-1 space-y-2 pt-0.5">

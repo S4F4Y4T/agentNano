@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MessageItem } from "@/components/dashboard/message-item";
 import { Composer } from "@/components/dashboard/composer";
-import { DeskAgentLogo } from "@/components/deskagent-logo";
+import { AgentNanoLogo } from "@/components/agentnano-logo";
 
 export default function ChatConversationPage() {
   const params = useParams<{ id: string }>();
@@ -59,7 +59,7 @@ export default function ChatConversationPage() {
   if (!agentConfig) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-        <DeskAgentLogo iconOnly className="scale-150" />
+        <AgentNanoLogo iconOnly className="scale-150" />
         <p className="text-sm text-muted-foreground">
           Configure your agent before chatting.
         </p>
@@ -82,7 +82,7 @@ export default function ChatConversationPage() {
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{conversation.title}</p>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span>DeskAgent</span>
+            <span>AgentNano</span>
             <span>·</span>
             <Badge variant="outline" className="h-5 px-1.5 font-mono text-[11px] font-normal">
               {agentConfig.model}
@@ -101,15 +101,15 @@ export default function ChatConversationPage() {
       <div className="flex-1 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-            <DeskAgentLogo iconOnly className="scale-150" />
+            <AgentNanoLogo iconOnly className="scale-150" />
             <p className="text-sm text-muted-foreground">
-              Ask DeskAgent anything to get started.
+              Ask AgentNano anything to get started.
             </p>
           </div>
         ) : (
           <div className="mx-auto flex max-w-[880px] flex-col gap-6 px-6 py-6">
             {messages.map((message) => (
-              <MessageItem key={message.id} message={message} agentName="DeskAgent" />
+              <MessageItem key={message.id} message={message} agentName="AgentNano" />
             ))}
             <div ref={bottomRef} />
           </div>
@@ -117,7 +117,7 @@ export default function ChatConversationPage() {
       </div>
 
       <div className="mx-auto w-full max-w-[880px] px-6 pb-6">
-        <Composer conversationId={conversation.id} agentName="DeskAgent" />
+        <Composer conversationId={conversation.id} agentName="AgentNano" />
       </div>
     </div>
   );

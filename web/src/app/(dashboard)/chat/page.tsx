@@ -6,7 +6,7 @@ import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useAppData } from "@/lib/app-data";
 import { Button } from "@/components/ui/button";
-import { DeskAgentLogo } from "@/components/deskagent-logo";
+import { AgentNanoLogo } from "@/components/agentnano-logo";
 
 export default function ChatIndexPage() {
   const router = useRouter();
@@ -42,10 +42,10 @@ export default function ChatIndexPage() {
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
-      <DeskAgentLogo iconOnly className="scale-150" />
+      <AgentNanoLogo iconOnly className="scale-150" />
       <div className="space-y-1">
         <p className="text-sm font-medium">No conversations yet.</p>
-        <p className="text-sm text-muted-foreground">Start one to talk to DeskAgent.</p>
+        <p className="text-sm text-muted-foreground">Start one to talk to AgentNano.</p>
       </div>
       <Button onClick={handleNewChat}>
         <Plus className="size-4" />

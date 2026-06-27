@@ -22,7 +22,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DeskAgent",
+  title: "AgentNano",
   description: "Your helpful desk companion.",
 };
 
