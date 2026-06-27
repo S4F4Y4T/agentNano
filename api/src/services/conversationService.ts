@@ -1,4 +1,5 @@
 import { rm } from "node:fs/promises";
+import path from "node:path";
 import { Conversation } from "../db/models/Conversation.js";
 import { Message } from "../db/models/Message.js";
 import { Attachment } from "../db/models/Attachment.js";
@@ -165,9 +166,34 @@ export async function sendMessage(
   if (isFirstMessage) conversation.title = input.content.slice(0, 60) || "New chat";
   await conversation.save();
 
-  const history = [...priorMessages, userMessage]
-    .slice(-40)
-    .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+  const allMessages = [...priorMessages, userMessage].slice(-40);
+  const allMessageIds = allMessages.map((m) => m._id);
+  const attachmentsForHistory = await Attachment.find({ messageId: { $in: allMessageIds } });
+
+  const attachmentsByMessageId = new Map<string, any[]>();
+  for (const att of attachmentsForHistory) {
+    if (att.messageId) {
+      const key = String(att.messageId);
+      if (!attachmentsByMessageId.has(key)) {
+        attachmentsByMessageId.set(key, []);
+      }
+      attachmentsByMessageId.get(key)!.push(att);
+    }
+  }
+
+  const history = allMessages.map((m) => {
+    const key = String(m._id);
+    const messageAttachments = attachmentsByMessageId.get(key) || [];
+    return {
+      role: m.role as "user" | "assistant",
+      content: m.content,
+      attachments: messageAttachments.map((att) => ({
+        filename: att.filename,
+        mimeType: att.mimeType,
+        filePath: path.join(attachmentsDirFor(conversationId), att.storageRelativePath),
+      })),
+    };
+  });
 
   return {
     userMessage: serializeMessage(userMessage),

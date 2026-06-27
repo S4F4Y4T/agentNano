@@ -56,11 +56,13 @@ export function Composer({
 
   const handleSend = async () => {
     if (isSending || isUploading || (!value.trim() && attachments.length === 0)) return;
+    const content = value.trim();
+    const messageAttachments = attachments;
+    setValue("");
+    setAttachments([]);
     setIsSending(true);
     try {
-      await sendMessage(conversationId, value.trim(), attachments);
-      setValue("");
-      setAttachments([]);
+      await sendMessage(conversationId, content, messageAttachments);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't send message");
     } finally {
