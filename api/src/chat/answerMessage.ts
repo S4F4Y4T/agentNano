@@ -1,6 +1,7 @@
-import { AIMessage, HumanMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages";
+import { AIMessage, HumanMessage, SystemMessage, ToolMessage, type BaseMessage } from "@langchain/core/messages";
 import { readFile } from "node:fs/promises";
 import { buildChatModel, type ModelConfig } from "./modelFactory.js";
+import { tools } from "./tools.js";
 
 export interface ChatHistoryItem {
   role: "user" | "assistant";
@@ -18,7 +19,11 @@ export async function answerMessage(
   history: ChatHistoryItem[],
   onToken: (token: string) => void
 ): Promise<string> {
-  const model = buildChatModel(config);
+  const baseModel = buildChatModel(config);
+  if (typeof (baseModel as any).bindTools !== "function") {
+    throw new Error("This model does not support tool calling");
+  }
+  const model = (baseModel as any).bindTools(tools);
 
   const messages: BaseMessage[] = [new SystemMessage(systemPrompt)];
   for (const item of history) {
@@ -73,15 +78,40 @@ export async function answerMessage(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 60_000);
   try {
-    const stream = await model.stream(messages, { signal: controller.signal });
-    let full = "";
-    for await (const chunk of stream) {
-      const token = typeof chunk.content === "string" ? chunk.content : JSON.stringify(chunk.content);
-      if (!token) continue;
-      full += token;
-      onToken(token);
+    let fullResponse = "";
+    while (true) {
+      const response = await model.invoke(messages, { signal: controller.signal });
+
+      if (response.tool_calls && response.tool_calls.length > 0) {
+        messages.push(response);
+
+        for (const toolCall of response.tool_calls) {
+          const toolInstance = tools.find((t) => t.name === toolCall.name);
+          if (toolInstance) {
+            onToken(`\n*[Calling tool: ${toolCall.name} with args: ${JSON.stringify(toolCall.args)}...]*\n`);
+
+            const toolResult = await (toolInstance as any).invoke(toolCall.args);
+
+            messages.push(
+              new ToolMessage({
+                content: typeof toolResult === "string" ? toolResult : JSON.stringify(toolResult),
+                tool_call_id: toolCall.id || "",
+              })
+            );
+          }
+        }
+      } else {
+        const stream = await model.stream(messages, { signal: controller.signal });
+        for await (const chunk of stream) {
+          const token = typeof chunk.content === "string" ? chunk.content : JSON.stringify(chunk.content);
+          if (!token) continue;
+          fullResponse += token;
+          onToken(token);
+        }
+        break;
+      }
     }
-    return full;
+    return fullResponse;
   } finally {
     clearTimeout(timeout);
   }
