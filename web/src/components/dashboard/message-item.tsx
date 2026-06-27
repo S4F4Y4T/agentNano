@@ -18,7 +18,7 @@ export function MessageItem({
   const isUser = message.role === "user";
 
   return (
-    <div className="flex gap-3">
+    <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
       <div className="shrink-0 pt-0.5">
         {isUser ? (
           <span className="flex size-7 items-center justify-center rounded-md bg-secondary text-xs font-medium text-secondary-foreground">
@@ -28,11 +28,11 @@ export function MessageItem({
           <AgentNanoLogo iconOnly />
         )}
       </div>
-      <div className="min-w-0 flex-1 space-y-2 pt-0.5">
+      <div className={`min-w-0 flex-1 space-y-2 pt-0.5 ${isUser ? "text-right" : ""}`}>
         <p className="text-sm font-medium">{isUser ? "You" : agentName}</p>
 
         {message.attachments && message.attachments.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
+          <div className={`flex flex-wrap gap-1.5 ${isUser ? "justify-end" : ""}`}>
             {message.attachments.map((a) => (
               <span
                 key={a.id}
