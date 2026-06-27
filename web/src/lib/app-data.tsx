@@ -190,20 +190,20 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
 
   const sendMessage = useCallback(
     async (conversationId: string, content: string, attachments: Attachment[]) => {
-      const res = await api.post<{ message: Message }>(
+      const res = await api.post<{ message: Message; reply: Message }>(
         `/conversations/${conversationId}/messages`,
         { content, attachmentIds: attachments.map((a) => a.id) }
       );
       setMessagesByConversation((prev) => ({
         ...prev,
-        [conversationId]: [...(prev[conversationId] ?? []), res.message],
+        [conversationId]: [...(prev[conversationId] ?? []), res.message, res.reply],
       }));
       setConversations((prev) =>
         prev.map((c) =>
           c.id === conversationId
             ? {
                 ...c,
-                lastMessageAt: res.message.createdAt,
+                lastMessageAt: res.reply.createdAt,
                 title: c.title === "New chat" ? content.slice(0, 60) : c.title,
               }
             : c

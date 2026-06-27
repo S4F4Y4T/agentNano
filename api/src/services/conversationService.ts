@@ -2,7 +2,10 @@ import { rm } from "node:fs/promises";
 import { Conversation } from "../db/models/Conversation.js";
 import { Message } from "../db/models/Message.js";
 import { Attachment } from "../db/models/Attachment.js";
+import { AgentConfig } from "../db/models/AgentConfig.js";
 import { attachmentsDirFor } from "../storage/attachments.js";
+import { decryptSecret } from "../utils/crypto.js";
+import { answerMessage } from "../chat/answerMessage.js";
 import { HttpError } from "../utils/httpError.js";
 
 export interface PublicConversation {
@@ -114,12 +117,24 @@ export async function listMessages(
   return messages.map(serializeMessage);
 }
 
+export interface SendMessageResult {
+  message: PublicMessage;
+  reply: PublicMessage;
+}
+
 export async function sendMessage(
   userId: string,
   conversationId: string,
   input: { content: string; attachmentIds: string[] }
-): Promise<PublicMessage> {
+): Promise<SendMessageResult> {
   const conversation = await findOwnedConversation(userId, conversationId);
+
+  const agentConfig = await AgentConfig.findOne({ userId });
+  if (!agentConfig) {
+    throw new HttpError(400, "Configure your agent before chatting");
+  }
+
+  const priorMessages = await Message.find({ conversationId }).sort({ createdAt: 1 });
 
   const attachmentDocs = input.attachmentIds.length
     ? await Attachment.find({ _id: { $in: input.attachmentIds }, conversationId })
@@ -150,5 +165,33 @@ export async function sendMessage(
   if (isFirstMessage) conversation.title = input.content.slice(0, 60) || "New chat";
   await conversation.save();
 
-  return serializeMessage(userMessage);
+  const history = [...priorMessages, userMessage]
+    .slice(-40)
+    .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+
+  let replyContent: string;
+  try {
+    replyContent = await answerMessage(
+      {
+        providerType: agentConfig.providerType,
+        baseUrl: agentConfig.baseUrl,
+        apiKey: decryptSecret(agentConfig.apiKeyEncrypted),
+        model: agentConfig.model,
+      },
+      agentConfig.systemPrompt,
+      history
+    );
+  } catch {
+    replyContent = "Couldn't reach the provider. Check the API key and try again.";
+  }
+
+  const assistantMessage = await Message.create({
+    conversationId,
+    role: "assistant",
+    content: replyContent,
+  });
+  conversation.lastMessageAt = new Date();
+  await conversation.save();
+
+  return { message: serializeMessage(userMessage), reply: serializeMessage(assistantMessage) };
 }

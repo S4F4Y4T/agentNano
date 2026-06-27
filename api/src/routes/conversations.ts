@@ -55,7 +55,7 @@ export async function conversationsRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: "Invalid input", details: parsed.error.flatten() });
     }
 
-    const message = await sendMessage(request.userId!, id, parsed.data);
-    return reply.code(201).send({ message });
+    const result = await sendMessage(request.userId!, id, parsed.data);
+    return reply.code(201).send(result);
   });
 }
