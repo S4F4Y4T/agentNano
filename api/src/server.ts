@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
 import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
+import { ZodError } from "zod";
 import { env } from "./config/env.js";
 import { authRoutes } from "./routes/auth.js";
 import { agentConfigRoutes } from "./routes/agent-config.js";
@@ -22,8 +23,8 @@ export async function buildServer() {
     if (err instanceof HttpError) {
       return reply.code(err.status).send({ error: err.message, details: err.details });
     }
-    if (err.validation) {
-      return reply.code(400).send({ error: "Invalid input", details: err.validation });
+    if (err instanceof ZodError) {
+      return reply.code(400).send({ error: "Invalid input", details: err.flatten() });
     }
     app.log.error({ err }, "unhandled error");
     return reply.code(500).send({ error: "Internal server error" });
