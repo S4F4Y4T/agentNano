@@ -12,6 +12,7 @@ const envSchema = z.object({
     .length(64, "MASTER_ENCRYPTION_KEY must be a 64-char hex string (32 bytes)"),
   ATTACHMENTS_ROOT: z.string().default("./storage/attachments"),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  REDIS_URL: z.string().default("redis://127.0.0.1:6379"),
 });
 
 const parsed = envSchema.safeParse(process.env);

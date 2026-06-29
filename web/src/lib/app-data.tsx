@@ -47,6 +47,8 @@ interface AppDataContextValue {
   conversationsLoaded: boolean;
   messagesByConversation: Record<string, Message[]>;
   ensureMessagesLoaded: (conversationId: string) => void;
+  refreshMessages: (conversationId: string) => Promise<void>;
+  refreshConversations: () => Promise<void>;
   createConversation: () => Promise<string>;
   renameConversation: (id: string, title: string) => void;
   deleteConversation: (id: string) => void;
@@ -178,6 +180,37 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       });
   }, []);
 
+  const refreshMessages = useCallback(async (conversationId: string) => {
+    try {
+      const res = await api.get<{ messages: Message[] }>(`/conversations/${conversationId}/messages`);
+      setMessagesByConversation((prev) => {
+        const current = prev[conversationId] ?? [];
+        const lengthChanged = current.length !== res.messages.length;
+        const lastMessageChanged =
+          current.length > 0 &&
+          res.messages.length > 0 &&
+          current[current.length - 1].id !== res.messages[res.messages.length - 1].id;
+
+        const isStreaming = current.some((m) => m.streaming);
+        if ((lengthChanged || lastMessageChanged) && !isStreaming) {
+          return { ...prev, [conversationId]: res.messages };
+        }
+        return prev;
+      });
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const refreshConversations = useCallback(async () => {
+    try {
+      const res = await api.get<{ conversations: Conversation[] }>("/conversations");
+      setConversations(res.conversations);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const uploadAttachment = useCallback(
     async (conversationId: string, file: File) => {
       const res = await api.upload<{ attachment: Attachment }>(
@@ -289,6 +322,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         conversationsLoaded,
         messagesByConversation,
         ensureMessagesLoaded,
+        refreshMessages,
+        refreshConversations,
         createConversation,
         renameConversation,
         deleteConversation,

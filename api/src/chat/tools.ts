@@ -1,5 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
+import { commandQueue } from "../services/queueService.js";
+import { requestContext } from "../utils/context.js";
 
 export const weatherTool = tool(
   async ({ location }) => {
@@ -74,4 +76,49 @@ export const jokeTool = tool(
   }
 );
 
-export const tools = [weatherTool, timeTool, webSearchTool, jokeTool];
+export const scheduleCommandTool = tool(
+  async ({ command, cron, delaySeconds }) => {
+    const ctx = requestContext.getStore();
+    if (!ctx || !ctx.conversationId) {
+      return "Error: Could not determine active conversation context.";
+    }
+
+    try {
+      if (cron) {
+        await commandQueue.add(
+          "repeat-command",
+          { command, conversationId: ctx.conversationId, cron },
+          {
+            repeat: {
+              pattern: cron,
+            },
+          }
+        );
+        return `Successfully scheduled repeatable command \`${command}\` with cron pattern \`${cron}\`.`;
+      } else {
+        const delayMs = (delaySeconds ?? 0) * 1000;
+        await commandQueue.add(
+          "delay-command",
+          { command, conversationId: ctx.conversationId },
+          {
+            delay: delayMs,
+          }
+        );
+        return `Successfully scheduled command \`${command}\` to run in ${delaySeconds ?? 0} seconds.`;
+      }
+    } catch (err: any) {
+      return `Failed to schedule command: ${err.message || err}`;
+    }
+  },
+  {
+    name: "schedule_command",
+    description: "Schedule a shell/system command to run in the background. Output will be posted to this chat. Specify either a cron expression for repeating runs, or delaySeconds for a one-off run.",
+    schema: z.object({
+      command: z.string().describe("The shell command to run on the server"),
+      cron: z.string().optional().describe("Optional cron pattern (e.g., '* * * * *' for every minute) to run repeatedly"),
+      delaySeconds: z.number().optional().describe("Optional delay in seconds before executing the command once"),
+    }),
+  }
+);
+
+export const tools = [weatherTool, timeTool, webSearchTool, jokeTool, scheduleCommandTool];

@@ -4,7 +4,7 @@ import { buildChatModel, type ModelConfig } from "./modelFactory.js";
 import { tools } from "./tools.js";
 
 export interface ChatHistoryItem {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
   attachments?: {
     filename: string;
@@ -27,7 +27,9 @@ export async function answerMessage(
 
   const messages: BaseMessage[] = [new SystemMessage(systemPrompt)];
   for (const item of history) {
-    if (item.role === "user" && item.attachments && item.attachments.length > 0) {
+    if (item.role === "system") {
+      messages.push(new SystemMessage(item.content));
+    } else if (item.role === "user" && item.attachments && item.attachments.length > 0) {
       const contentBlocks: any[] = [];
       if (item.content) {
         contentBlocks.push({ type: "text", text: item.content });

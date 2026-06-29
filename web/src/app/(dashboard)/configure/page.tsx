@@ -33,7 +33,7 @@ import { StatusPill } from "@/components/dashboard/status-pill";
 import { PROVIDER_BASE_URLS, PROVIDER_LABELS, type ProviderType } from "@/lib/types";
 
 const configSchema = z.object({
-  providerType: z.enum(["openai", "gemini", "openrouter", "custom"]),
+  providerType: z.enum(["openai", "gemini", "openrouter", "opencode", "custom"]),
   baseUrl: z.string().min(1, "Base URL is required"),
   apiKey: z.string().optional(),
   model: z.string().min(1, "Model is required"),

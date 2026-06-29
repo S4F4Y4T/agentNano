@@ -1,6 +1,7 @@
 import { env } from "./config/env.js";
 import { connectDb } from "./db/connection.js";
 import { buildServer } from "./server.js";
+import "./services/queueService.js";
 
 async function main() {
   await connectDb();

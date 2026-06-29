@@ -8,6 +8,7 @@ import { attachmentsDirFor } from "../storage/attachments.js";
 import { decryptSecret } from "../utils/crypto.js";
 import { answerMessage } from "../chat/answerMessage.js";
 import { HttpError } from "../utils/httpError.js";
+import { requestContext } from "../utils/context.js";
 
 export interface PublicConversation {
   id: string;
@@ -184,9 +185,12 @@ export async function sendMessage(
   const history = allMessages.map((m) => {
     const key = String(m._id);
     const messageAttachments = attachmentsByMessageId.get(key) || [];
+    const isScheduledCommand = m.role === "assistant" && m.content.startsWith("**[Scheduled Command Executed]**");
     return {
-      role: m.role as "user" | "assistant",
-      content: m.content,
+      role: isScheduledCommand ? ("system" as const) : (m.role as "user" | "assistant"),
+      content: isScheduledCommand
+        ? `[Background System Notification: The following scheduled command was executed automatically]\n${m.content}`
+        : m.content,
       attachments: messageAttachments.map((att) => ({
         filename: att.filename,
         mimeType: att.mimeType,
@@ -200,16 +204,18 @@ export async function sendMessage(
     streamReply: async (onToken) => {
       let replyContent = "";
       try {
-        replyContent = await answerMessage(
-          {
-            providerType: agentConfig.providerType,
-            baseUrl: agentConfig.baseUrl,
-            apiKey: decryptSecret(agentConfig.apiKeyEncrypted),
-            model: agentConfig.model,
-          },
-          agentConfig.systemPrompt,
-          history,
-          onToken
+        replyContent = await requestContext.run({ userId, conversationId }, () =>
+          answerMessage(
+            {
+              providerType: agentConfig.providerType,
+              baseUrl: agentConfig.baseUrl,
+              apiKey: decryptSecret(agentConfig.apiKeyEncrypted),
+              model: agentConfig.model,
+            },
+            agentConfig.systemPrompt,
+            history,
+            onToken
+          )
         );
       } catch {
         replyContent = "Couldn't reach the provider. Check the API key and try again.";

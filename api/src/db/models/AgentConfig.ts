@@ -1,6 +1,6 @@
 import { Schema, model, Types } from "mongoose";
 
-export const PROVIDER_TYPES = ["openai", "gemini", "openrouter", "custom"] as const;
+export const PROVIDER_TYPES = ["openai", "gemini", "openrouter", "opencode", "custom"] as const;
 export type ProviderType = (typeof PROVIDER_TYPES)[number];
 
 const agentConfigSchema = new Schema(

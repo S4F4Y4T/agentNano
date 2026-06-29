@@ -20,19 +20,45 @@ export default function ChatConversationPage() {
     messagesByConversation,
     createConversation,
     ensureMessagesLoaded,
+    refreshMessages,
+    refreshConversations,
   } = useAppData();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const prevMessagesLengthRef = useRef(0);
 
   const conversation = conversations.find((c) => c.id === params.id);
   const messages = messagesByConversation[params.id] ?? [];
   const lastMessageContent = messages[messages.length - 1]?.content;
 
   useEffect(() => {
-    ensureMessagesLoaded(params.id);
-  }, [params.id, ensureMessagesLoaded]);
+    prevMessagesLengthRef.current = 0;
+  }, [params.id]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    ensureMessagesLoaded(params.id);
+
+    const interval = setInterval(() => {
+      refreshMessages(params.id);
+      refreshConversations();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [params.id, ensureMessagesLoaded, refreshMessages, refreshConversations]);
+
+  useEffect(() => {
+    if (messages.length === 0) return;
+
+    const isInitialLoad = prevMessagesLengthRef.current === 0;
+    const scroll = () => {
+      bottomRef.current?.scrollIntoView({
+        behavior: isInitialLoad ? "auto" : "smooth",
+      });
+    };
+
+    const timer = setTimeout(scroll, 100);
+    prevMessagesLengthRef.current = messages.length;
+
+    return () => clearTimeout(timer);
   }, [messages.length, lastMessageContent]);
 
   if (!conversationsLoaded) {

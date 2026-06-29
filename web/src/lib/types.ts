@@ -1,9 +1,10 @@
-export type ProviderType = "openai" | "gemini" | "openrouter" | "custom";
+export type ProviderType = "openai" | "gemini" | "openrouter" | "opencode" | "custom";
 
 export const PROVIDER_LABELS: Record<ProviderType, string> = {
   openai: "OpenAI",
   gemini: "Google Gemini",
   openrouter: "OpenRouter",
+  opencode: "OpenCode",
   custom: "Custom (OpenAI-compatible)",
 };
 
@@ -11,6 +12,7 @@ export const PROVIDER_BASE_URLS: Record<ProviderType, string> = {
   openai: "https://api.openai.com/v1",
   gemini: "https://generativelanguage.googleapis.com/v1beta",
   openrouter: "https://openrouter.ai/api/v1",
+  opencode: "https://opencode.ai/zen/v1",
   custom: "",
 };
 
