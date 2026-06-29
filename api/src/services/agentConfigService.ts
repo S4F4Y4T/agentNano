@@ -2,7 +2,7 @@ import { HumanMessage } from "@langchain/core/messages";
 import OpenAI from "openai";
 import { AgentConfig, type ProviderType } from "../db/models/AgentConfig.js";
 import { encryptSecret, decryptSecret, maskApiKey } from "../utils/crypto.js";
-import { buildChatModel } from "../chat/modelFactory.js";
+import { buildChatModel } from "../agent/modelFactory.js";
 import { HttpError } from "../utils/httpError.js";
 
 export interface PublicAgentConfig {

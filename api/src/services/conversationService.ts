@@ -6,7 +6,7 @@ import { Attachment } from "../db/models/Attachment.js";
 import { AgentConfig } from "../db/models/AgentConfig.js";
 import { attachmentsDirFor } from "../storage/attachments.js";
 import { decryptSecret } from "../utils/crypto.js";
-import { answerMessage } from "../chat/answerMessage.js";
+import { runAgent } from "../agent/runAgent.js";
 import { HttpError } from "../utils/httpError.js";
 import { requestContext } from "../utils/context.js";
 
@@ -214,17 +214,17 @@ export async function sendMessage(
       let replyContent = "";
       try {
         replyContent = await requestContext.run({ userId, conversationId }, () =>
-          answerMessage(
-            {
+          runAgent({
+            config: {
               providerType: agentConfig.providerType,
               baseUrl: agentConfig.baseUrl,
               apiKey: decryptSecret(agentConfig.apiKeyEncrypted),
               model: agentConfig.model,
             },
-            agentConfig.systemPrompt,
+            systemPrompt: agentConfig.systemPrompt,
             history,
-            onToken
-          )
+            onToken,
+          })
         );
       } catch {
         replyContent = "Couldn't reach the provider. Check the API key and try again.";
