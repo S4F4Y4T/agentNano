@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { commandQueue } from "../services/queueService.js";
+import { scheduleCronCommand, scheduleOnceCommand } from "../services/queueService.js";
 import { requestContext } from "../utils/context.js";
 
 export const weatherTool = tool(
@@ -79,32 +79,18 @@ export const jokeTool = tool(
 export const scheduleCommandTool = tool(
   async ({ command, cron, delaySeconds }) => {
     const ctx = requestContext.getStore();
-    if (!ctx || !ctx.conversationId) {
+    if (!ctx || !ctx.conversationId || !ctx.userId) {
       return "Error: Could not determine active conversation context.";
     }
 
     try {
       if (cron) {
-        await commandQueue.add(
-          "repeat-command",
-          { command, conversationId: ctx.conversationId, cron },
-          {
-            repeat: {
-              pattern: cron,
-            },
-          }
-        );
-        return `Successfully scheduled repeatable command \`${command}\` with cron pattern \`${cron}\`.`;
+        await scheduleCronCommand({ command, cron, conversationId: ctx.conversationId, userId: ctx.userId });
+        return `Successfully scheduled repeatable command \`${command}\` with cron pattern \`${cron}\`. You can view or cancel it from the Scheduled Tasks page.`;
       } else {
-        const delayMs = (delaySeconds ?? 0) * 1000;
-        await commandQueue.add(
-          "delay-command",
-          { command, conversationId: ctx.conversationId },
-          {
-            delay: delayMs,
-          }
-        );
-        return `Successfully scheduled command \`${command}\` to run in ${delaySeconds ?? 0} seconds.`;
+        const seconds = delaySeconds ?? 0;
+        await scheduleOnceCommand({ command, delaySeconds: seconds, conversationId: ctx.conversationId, userId: ctx.userId });
+        return `Successfully scheduled command \`${command}\` to run in ${seconds} seconds. You can view or cancel it from the Scheduled Tasks page.`;
       }
     } catch (err: any) {
       return `Failed to schedule command: ${err.message || err}`;

@@ -14,6 +14,8 @@ import type {
   Conversation,
   Message,
   ProviderType,
+  ScheduledTask,
+  ScheduledTaskType,
   Session,
 } from "./types";
 import { api, ApiError } from "./api";
@@ -47,8 +49,7 @@ interface AppDataContextValue {
   conversationsLoaded: boolean;
   messagesByConversation: Record<string, Message[]>;
   ensureMessagesLoaded: (conversationId: string) => void;
-  refreshMessages: (conversationId: string) => Promise<void>;
-  refreshConversations: () => Promise<void>;
+  receiveMessage: (conversationId: string, message: Message) => void;
   createConversation: () => Promise<string>;
   renameConversation: (id: string, title: string) => void;
   deleteConversation: (id: string) => void;
@@ -58,6 +59,11 @@ interface AppDataContextValue {
     attachments: Attachment[]
   ) => Promise<void>;
   uploadAttachment: (conversationId: string, file: File) => Promise<Attachment>;
+
+  scheduledTasks: ScheduledTask[];
+  scheduledTasksLoaded: boolean;
+  loadScheduledTasks: () => Promise<void>;
+  cancelScheduledTask: (id: string, type: ScheduledTaskType) => Promise<void>;
 }
 
 const AppDataContext = createContext<AppDataContextValue | null>(null);
@@ -180,35 +186,34 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       });
   }, []);
 
-  const refreshMessages = useCallback(async (conversationId: string) => {
-    try {
-      const res = await api.get<{ messages: Message[] }>(`/conversations/${conversationId}/messages`);
-      setMessagesByConversation((prev) => {
-        const current = prev[conversationId] ?? [];
-        const lengthChanged = current.length !== res.messages.length;
-        const lastMessageChanged =
-          current.length > 0 &&
-          res.messages.length > 0 &&
-          current[current.length - 1].id !== res.messages[res.messages.length - 1].id;
+  const receiveMessage = useCallback((conversationId: string, message: Message) => {
+    setMessagesByConversation((prev) => {
+      const current = prev[conversationId] ?? [];
+      if (current.some((m) => m.id === message.id)) return prev;
+      return { ...prev, [conversationId]: [...current, message] };
+    });
+    setConversations((prev) =>
+      prev.map((c) => (c.id === conversationId ? { ...c, lastMessageAt: message.createdAt } : c))
+    );
+  }, []);
 
-        const isStreaming = current.some((m) => m.streaming);
-        if ((lengthChanged || lastMessageChanged) && !isStreaming) {
-          return { ...prev, [conversationId]: res.messages };
-        }
-        return prev;
-      });
+  const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([]);
+  const [scheduledTasksLoaded, setScheduledTasksLoaded] = useState(false);
+
+  const loadScheduledTasks = useCallback(async () => {
+    try {
+      const res = await api.get<{ tasks: ScheduledTask[] }>("/scheduled-tasks");
+      setScheduledTasks(res.tasks);
     } catch {
-      // ignore
+      setScheduledTasks([]);
+    } finally {
+      setScheduledTasksLoaded(true);
     }
   }, []);
 
-  const refreshConversations = useCallback(async () => {
-    try {
-      const res = await api.get<{ conversations: Conversation[] }>("/conversations");
-      setConversations(res.conversations);
-    } catch {
-      // ignore
-    }
+  const cancelScheduledTask = useCallback(async (id: string, type: ScheduledTaskType) => {
+    await api.delete(`/scheduled-tasks/${id}?type=${type}`);
+    setScheduledTasks((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
   const uploadAttachment = useCallback(
@@ -322,13 +327,16 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         conversationsLoaded,
         messagesByConversation,
         ensureMessagesLoaded,
-        refreshMessages,
-        refreshConversations,
+        receiveMessage,
         createConversation,
         renameConversation,
         deleteConversation,
         sendMessage,
         uploadAttachment,
+        scheduledTasks,
+        scheduledTasksLoaded,
+        loadScheduledTasks,
+        cancelScheduledTask,
       }}
     >
       {children}

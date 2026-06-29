@@ -9,6 +9,7 @@ import { authRoutes } from "./routes/auth.js";
 import { agentConfigRoutes } from "./routes/agent-config.js";
 import { conversationsRoutes } from "./routes/conversations.js";
 import { attachmentsRoutes } from "./routes/attachments.js";
+import { scheduledTasksRoutes } from "./routes/scheduled-tasks.js";
 import { HttpError } from "./utils/httpError.js";
 
 export async function buildServer() {
@@ -34,6 +35,7 @@ export async function buildServer() {
   await app.register(agentConfigRoutes);
   await app.register(conversationsRoutes);
   await app.register(attachmentsRoutes);
+  await app.register(scheduledTasksRoutes);
 
   app.get("/api/health", async () => ({ ok: true }));
 

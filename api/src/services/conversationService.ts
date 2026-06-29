@@ -58,7 +58,7 @@ function serializeMessage(m: {
   };
 }
 
-async function findOwnedConversation(userId: string, conversationId: string) {
+export async function findOwnedConversation(userId: string, conversationId: string) {
   const conversation = await Conversation.findOne({ _id: conversationId, userId });
   if (!conversation) {
     throw new HttpError(404, "Conversation not found");

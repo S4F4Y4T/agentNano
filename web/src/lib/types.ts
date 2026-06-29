@@ -59,3 +59,15 @@ export interface Session {
   name: string;
   email: string;
 }
+
+export type ScheduledTaskType = "once" | "cron";
+
+export interface ScheduledTask {
+  id: string;
+  type: ScheduledTaskType;
+  command: string;
+  cron?: string;
+  conversationId: string;
+  conversationTitle: string;
+  nextRunAt?: string;
+}

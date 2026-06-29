@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Check,
+  Clock,
   MessageSquare,
   MoreHorizontal,
   Pencil,
@@ -40,6 +41,7 @@ import {
 
 const NAV_ITEMS = [
   { href: "/chat", label: "Chat", icon: MessageSquare },
+  { href: "/tasks", label: "Scheduled tasks", icon: Clock },
   { href: "/configure", label: "Configure", icon: Settings },
 ];
 
@@ -54,7 +56,7 @@ export function Sidebar() {
   const [renameValue, setRenameValue] = useState("");
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
-  const inConfigure = pathname.startsWith("/configure");
+  const showThreads = pathname.startsWith("/chat");
 
   const threads = useMemo(() => {
     return conversations
@@ -83,7 +85,7 @@ export function Sidebar() {
 
       <nav className="flex flex-col gap-0.5 px-2">
         {NAV_ITEMS.map((item) => {
-          const active = item.href === "/chat" ? !inConfigure : inConfigure;
+          const active = pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
@@ -104,7 +106,7 @@ export function Sidebar() {
 
       <div className="my-2 h-px bg-sidebar-border" />
 
-      {!inConfigure && (
+      {showThreads && (
         <>
           <div className="flex flex-col gap-2 px-2">
             <Button onClick={handleNewChat} className="w-full justify-start">

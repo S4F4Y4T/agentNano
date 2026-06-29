@@ -20,8 +20,7 @@ export default function ChatConversationPage() {
     messagesByConversation,
     createConversation,
     ensureMessagesLoaded,
-    refreshMessages,
-    refreshConversations,
+    receiveMessage,
   } = useAppData();
   const bottomRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(0);
@@ -37,13 +36,16 @@ export default function ChatConversationPage() {
   useEffect(() => {
     ensureMessagesLoaded(params.id);
 
-    const interval = setInterval(() => {
-      refreshMessages(params.id);
-      refreshConversations();
-    }, 3000);
+    const source = new EventSource(`/api/conversations/${params.id}/events`);
+    source.onmessage = (event) => {
+      const payload = JSON.parse(event.data);
+      if (payload.type === "message") {
+        receiveMessage(params.id, payload.message);
+      }
+    };
 
-    return () => clearInterval(interval);
-  }, [params.id, ensureMessagesLoaded, refreshMessages, refreshConversations]);
+    return () => source.close();
+  }, [params.id, ensureMessagesLoaded, receiveMessage]);
 
   useEffect(() => {
     if (messages.length === 0) return;

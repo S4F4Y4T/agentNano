@@ -8,7 +8,9 @@ import {
   deleteConversation,
   listMessages,
   sendMessage,
+  findOwnedConversation,
 } from "../services/conversationService.js";
+import { conversationEvents } from "../services/conversationEvents.js";
 
 const sendMessageSchema = z.object({
   content: z.string().max(20_000),
@@ -46,6 +48,34 @@ export async function conversationsRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     const messages = await listMessages(request.userId!, id);
     return reply.send({ messages });
+  });
+
+  app.get("/api/conversations/:id/events", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    await findOwnedConversation(request.userId!, id);
+
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+    });
+    // Flush a byte immediately — otherwise the stream sits unflushed (through
+    // the proxy and the browser's own SSE parser) until the first real event,
+    // which can be a long wait if nothing happens right after connecting.
+    reply.raw.write(": connected\n\n");
+
+    const onMessage = (message: unknown) => {
+      reply.raw.write(`data: ${JSON.stringify({ type: "message", message })}\n\n`);
+    };
+    conversationEvents.on(id, onMessage);
+
+    const heartbeat = setInterval(() => reply.raw.write(": ping\n\n"), 25_000);
+
+    request.raw.on("close", () => {
+      clearInterval(heartbeat);
+      conversationEvents.off(id, onMessage);
+    });
   });
 
   app.post("/api/conversations/:id/messages", async (request, reply) => {

@@ -89,18 +89,30 @@ export async function answerMessage(
 
         for (const toolCall of response.tool_calls) {
           const toolInstance = tools.find((t) => t.name === toolCall.name);
-          if (toolInstance) {
-            onToken(`\n*[Calling tool: ${toolCall.name} with args: ${JSON.stringify(toolCall.args)}...]*\n`);
+          onToken(`\n*[Calling tool: ${toolCall.name} with args: ${JSON.stringify(toolCall.args)}...]*\n`);
 
-            const toolResult = await (toolInstance as any).invoke(toolCall.args);
-
-            messages.push(
-              new ToolMessage({
-                content: typeof toolResult === "string" ? toolResult : JSON.stringify(toolResult),
-                tool_call_id: toolCall.id || "",
-              })
-            );
+          let toolResult: unknown;
+          if (!toolInstance) {
+            toolResult = `Error: no tool named "${toolCall.name}" is available.`;
+          } else {
+            try {
+              toolResult = await (toolInstance as any).invoke(toolCall.args);
+            } catch (err: any) {
+              // A malformed tool call (e.g. missing a required argument) throws
+              // before the tool's own body runs. Every tool_call must still get
+              // a matching ToolMessage or the next request to the provider is
+              // rejected outright — so report the failure back to the model
+              // instead of letting it kill the whole turn.
+              toolResult = `Error: tool call failed - ${err?.message || err}`;
+            }
           }
+
+          messages.push(
+            new ToolMessage({
+              content: typeof toolResult === "string" ? toolResult : JSON.stringify(toolResult),
+              tool_call_id: toolCall.id || "",
+            })
+          );
         }
       } else {
         const stream = await model.stream(messages, { signal: controller.signal });
