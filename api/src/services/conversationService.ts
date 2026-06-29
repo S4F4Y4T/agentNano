@@ -186,11 +186,20 @@ export async function sendMessage(
     const key = String(m._id);
     const messageAttachments = attachmentsByMessageId.get(key) || [];
     const isScheduledCommand = m.role === "assistant" && m.content.startsWith("**[Scheduled Command Executed]**");
+    
+    let content = m.content;
+    if (m.role === "assistant" && !isScheduledCommand) {
+      const idx = content.indexOf("**[Scheduled Command Executed]**");
+      if (idx !== -1) {
+        content = content.slice(0, idx).trim();
+      }
+    }
+
     return {
       role: isScheduledCommand ? ("system" as const) : (m.role as "user" | "assistant"),
       content: isScheduledCommand
-        ? `[Background System Notification: The following scheduled command was executed automatically]\n${m.content}`
-        : m.content,
+        ? `[Background System Notification: The following scheduled command was executed automatically]\n${content}`
+        : content,
       attachments: messageAttachments.map((att) => ({
         filename: att.filename,
         mimeType: att.mimeType,
