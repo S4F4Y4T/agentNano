@@ -9,7 +9,7 @@ import {
   listMessages,
   sendMessage,
   findOwnedConversation,
-} from "../services/conversationService.js";
+} from "../services/conversation/index.js";
 import { conversationEvents } from "../services/conversationEvents.js";
 
 const sendMessageSchema = z.object({

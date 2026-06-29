@@ -6,6 +6,7 @@ import type { CommandJobData } from "./commandJob.js";
 import { Message } from "../db/models/Message.js";
 import { Conversation } from "../db/models/Conversation.js";
 import { emitConversationMessage } from "./conversationEvents.js";
+import { formatScheduledCommandContent } from "./conversation/scheduledCommand.js";
 import { logger } from "../utils/logger.js";
 
 const execAsync = promisify(exec);
@@ -26,7 +27,7 @@ async function processCommandJob(job: Job<CommandJobData>) {
   }
 
   try {
-    const content = `**[Scheduled Command Executed]**\nCommand: \`${command}\`\nStatus: ${success ? "✅ Success" : "❌ Failed"}\n\nOutput:\n\`\`\`bash\n${output.trim()}\n\`\`\``;
+    const content = formatScheduledCommandContent(command, success, output);
 
     const message = await Message.create({
       conversationId,
