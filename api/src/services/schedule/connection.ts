@@ -1,6 +1,6 @@
 import { Queue } from "bullmq";
-import { env } from "../config/env.js";
-import type { CommandJobData } from "./commandJob.js";
+import { env } from "../../config/env.js";
+import type { CommandJobData } from "./types.js";
 
 const redisUrl = new URL(env.REDIS_URL);
 

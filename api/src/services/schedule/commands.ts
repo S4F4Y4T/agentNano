@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { commandQueue } from "./queueConnection.js";
-import { HttpError } from "../utils/httpError.js";
+import { commandQueue } from "./connection.js";
+import { HttpError } from "../../utils/httpError.js";
+import type { ScheduledTask } from "./types.js";
 
 export async function scheduleOnceCommand(data: {
   command: string;
@@ -32,15 +33,6 @@ export async function scheduleCronCommand(data: {
     }
   );
   return schedulerId;
-}
-
-export interface ScheduledTask {
-  id: string;
-  type: "once" | "cron";
-  command: string;
-  cron?: string;
-  conversationId: string;
-  nextRunAt?: string;
 }
 
 export async function listScheduledTasks(userId: string): Promise<ScheduledTask[]> {

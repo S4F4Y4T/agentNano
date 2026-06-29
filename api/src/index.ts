@@ -1,7 +1,7 @@
 import { env } from "./config/env.js";
 import { connectDb } from "./db/connection.js";
 import { buildServer } from "./server.js";
-import { startCommandWorker } from "./services/commandWorker.js";
+import { startCommandWorker } from "./services/schedule/index.js";
 
 async function main() {
   await connectDb();

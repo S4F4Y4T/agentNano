@@ -1,8 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authenticate } from "../middleware/authenticate.js";
-import { listScheduledTasksForUser } from "../services/scheduledTaskService.js";
-import { cancelScheduledTask } from "../services/queueService.js";
+import { listScheduledTasksForUser, cancelScheduledTask } from "../services/schedule/index.js";
 
 const cancelQuerySchema = z.object({ type: z.enum(["once", "cron"]) });
 

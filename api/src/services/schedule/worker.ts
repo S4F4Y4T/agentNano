@@ -1,13 +1,13 @@
 import { Worker, type Job } from "bullmq";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import { redisConnection } from "./queueConnection.js";
-import type { CommandJobData } from "./commandJob.js";
-import { Message } from "../db/models/Message.js";
-import { Conversation } from "../db/models/Conversation.js";
-import { emitConversationMessage } from "./conversationEvents.js";
-import { formatScheduledCommandContent } from "./conversation/scheduledCommand.js";
-import { logger } from "../utils/logger.js";
+import { redisConnection } from "./connection.js";
+import type { CommandJobData } from "./types.js";
+import { Message } from "../../db/models/Message.js";
+import { Conversation } from "../../db/models/Conversation.js";
+import { emitConversationMessage } from "../conversationEvents.js";
+import { formatScheduledCommandContent } from "../conversation/scheduledCommand.js";
+import { logger } from "../../utils/logger.js";
 
 const execAsync = promisify(exec);
 

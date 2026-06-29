@@ -1,9 +1,6 @@
-import { Conversation } from "../db/models/Conversation.js";
-import { listScheduledTasks, type ScheduledTask } from "./queueService.js";
-
-export interface PublicScheduledTask extends ScheduledTask {
-  conversationTitle: string;
-}
+import { Conversation } from "../../db/models/Conversation.js";
+import { listScheduledTasks } from "./commands.js";
+import type { PublicScheduledTask } from "./types.js";
 
 export async function listScheduledTasksForUser(userId: string): Promise<PublicScheduledTask[]> {
   const tasks = await listScheduledTasks(userId);
