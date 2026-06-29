@@ -11,9 +11,10 @@ import { conversationsRoutes } from "./routes/conversations.js";
 import { attachmentsRoutes } from "./routes/attachments.js";
 import { scheduledTasksRoutes } from "./routes/scheduled-tasks.js";
 import { HttpError } from "./utils/httpError.js";
+import { logger } from "./utils/logger.js";
 
 export async function buildServer() {
-  const app = Fastify({ logger: true });
+  const app = Fastify({ loggerInstance: logger });
 
   await app.register(cors, { origin: env.WEB_ORIGIN, credentials: true });
   await app.register(cookie);

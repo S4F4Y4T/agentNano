@@ -16,15 +16,9 @@ export async function scheduledTasksRoutes(app: FastifyInstance) {
 
   app.delete("/api/scheduled-tasks/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const parsed = cancelQuerySchema.safeParse(request.query);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: "Invalid input", details: parsed.error.flatten() });
-    }
+    const { type } = cancelQuerySchema.parse(request.query);
 
-    const cancelled = await cancelScheduledTask(request.userId!, id, parsed.data.type);
-    if (!cancelled) {
-      return reply.code(404).send({ error: "Scheduled task not found" });
-    }
+    await cancelScheduledTask(request.userId!, id, type);
     return reply.send({ ok: true });
   });
 }

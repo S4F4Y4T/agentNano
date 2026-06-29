@@ -171,7 +171,7 @@ export async function sendMessage(
   const allMessageIds = allMessages.map((m) => m._id);
   const attachmentsForHistory = await Attachment.find({ messageId: { $in: allMessageIds } });
 
-  const attachmentsByMessageId = new Map<string, any[]>();
+  const attachmentsByMessageId = new Map<string, (typeof attachmentsForHistory)[number][]>();
   for (const att of attachmentsForHistory) {
     if (att.messageId) {
       const key = String(att.messageId);

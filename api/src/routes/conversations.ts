@@ -80,12 +80,9 @@ export async function conversationsRoutes(app: FastifyInstance) {
 
   app.post("/api/conversations/:id/messages", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const parsed = sendMessageSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: "Invalid input", details: parsed.error.flatten() });
-    }
+    const input = sendMessageSchema.parse(request.body);
 
-    const prepared = await sendMessage(request.userId!, id, parsed.data);
+    const prepared = await sendMessage(request.userId!, id, input);
 
     reply.hijack();
     reply.raw.writeHead(200, {

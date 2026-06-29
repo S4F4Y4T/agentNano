@@ -2,6 +2,7 @@ import { AIMessage, HumanMessage, SystemMessage, ToolMessage, type BaseMessage }
 import { readFile } from "node:fs/promises";
 import { buildChatModel, type ModelConfig } from "./modelFactory.js";
 import { tools } from "./tools.js";
+import { logger } from "../utils/logger.js";
 
 export interface ChatHistoryItem {
   role: "user" | "assistant" | "system";
@@ -20,10 +21,10 @@ export async function answerMessage(
   onToken: (token: string) => void
 ): Promise<string> {
   const baseModel = buildChatModel(config);
-  if (typeof (baseModel as any).bindTools !== "function") {
+  if (!baseModel.bindTools) {
     throw new Error("This model does not support tool calling");
   }
-  const model = (baseModel as any).bindTools(tools);
+  const model = baseModel.bindTools(tools);
 
   const messages: BaseMessage[] = [new SystemMessage(systemPrompt)];
   for (const item of history) {
@@ -60,7 +61,7 @@ export async function answerMessage(
             });
           }
         } catch (err) {
-          console.error(`Failed to read attachment ${att.filename}:`, err);
+          logger.error({ err, filename: att.filename }, "failed to read attachment");
         }
       }
       messages.push(new HumanMessage({ content: contentBlocks }));
@@ -68,14 +69,6 @@ export async function answerMessage(
       messages.push(item.role === "user" ? new HumanMessage(item.content) : new AIMessage(item.content));
     }
   }
-
-  console.log("[llm:request]", JSON.stringify({
-    providerType: config.providerType,
-    model: config.model,
-    baseUrl: config.baseUrl,
-    systemPrompt,
-    history,
-  }));
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 60_000);
@@ -96,7 +89,7 @@ export async function answerMessage(
             toolResult = `Error: no tool named "${toolCall.name}" is available.`;
           } else {
             try {
-              toolResult = await (toolInstance as any).invoke(toolCall.args);
+              toolResult = await toolInstance.invoke(toolCall.args);
             } catch (err: any) {
               // A malformed tool call (e.g. missing a required argument) throws
               // before the tool's own body runs. Every tool_call must still get

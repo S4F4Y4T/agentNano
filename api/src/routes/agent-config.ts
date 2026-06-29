@@ -32,12 +32,8 @@ export async function agentConfigRoutes(app: FastifyInstance) {
   });
 
   app.put("/api/agent-config", async (request, reply) => {
-    const parsed = saveSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: "Invalid input", details: parsed.error.flatten() });
-    }
-
-    const agentConfig = await saveAgentConfig(request.userId!, parsed.data);
+    const input = saveSchema.parse(request.body);
+    const agentConfig = await saveAgentConfig(request.userId!, input);
     return reply.send({ agentConfig });
   });
 
@@ -47,12 +43,8 @@ export async function agentConfigRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/agent-config/models", async (request, reply) => {
-    const parsed = listModelsSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: "Invalid input", details: parsed.error.flatten() });
-    }
-
-    const models = await listProviderModels(request.userId!, parsed.data);
+    const input = listModelsSchema.parse(request.body);
+    const models = await listProviderModels(request.userId!, input);
     return reply.send({ models });
   });
 }

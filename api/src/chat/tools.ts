@@ -1,4 +1,4 @@
-import { tool } from "@langchain/core/tools";
+import { tool, type StructuredToolInterface } from "@langchain/core/tools";
 import { z } from "zod";
 import { scheduleCronCommand, scheduleOnceCommand } from "../services/queueService.js";
 import { requestContext } from "../utils/context.js";
@@ -107,4 +107,10 @@ export const scheduleCommandTool = tool(
   }
 );
 
-export const tools = [weatherTool, timeTool, webSearchTool, jokeTool, scheduleCommandTool];
+export const tools: StructuredToolInterface[] = [
+  weatherTool,
+  timeTool,
+  webSearchTool,
+  jokeTool,
+  scheduleCommandTool,
+];

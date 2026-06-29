@@ -23,23 +23,15 @@ export async function authRoutes(app: FastifyInstance) {
   };
 
   app.post("/api/auth/register", authRateLimit, async (request, reply) => {
-    const parsed = registerSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: "Invalid input", details: parsed.error.flatten() });
-    }
-
-    const { user, token } = await registerUser(parsed.data);
+    const input = registerSchema.parse(request.body);
+    const { user, token } = await registerUser(input);
     setSessionCookie(reply, token);
     return reply.code(201).send({ user });
   });
 
   app.post("/api/auth/login", authRateLimit, async (request, reply) => {
-    const parsed = loginSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: "Invalid input", details: parsed.error.flatten() });
-    }
-
-    const { user, token } = await loginUser(parsed.data);
+    const input = loginSchema.parse(request.body);
+    const { user, token } = await loginUser(input);
     setSessionCookie(reply, token);
     return reply.send({ user });
   });
