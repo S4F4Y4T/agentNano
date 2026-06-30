@@ -2,6 +2,8 @@ import { tool, type StructuredToolInterface } from "@langchain/core/tools";
 import { z } from "zod";
 import { scheduleCronCommand, scheduleOnceCommand } from "../services/schedule/index.js";
 import { requestContext } from "../utils/context.js";
+import { sandboxTools } from "./sandboxTools.js";
+import { updatePlanTool } from "./planningTool.js";
 
 export const weatherTool = tool(
   async ({ location }) => {
@@ -108,6 +110,8 @@ export const scheduleCommandTool = tool(
 );
 
 export const tools: StructuredToolInterface[] = [
+  updatePlanTool,
+  ...sandboxTools,
   weatherTool,
   timeTool,
   webSearchTool,

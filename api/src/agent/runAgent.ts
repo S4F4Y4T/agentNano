@@ -1,19 +1,20 @@
-import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import { StateGraph, MessagesAnnotation, END, START, GraphRecursionError } from "@langchain/langgraph";
 import type { AIMessageChunk, BaseMessage, MessageContent } from "@langchain/core/messages";
+import { AIMessage } from "@langchain/core/messages";
 import { buildChatModel, type ModelConfig } from "./modelFactory.js";
 import { buildMessages } from "./buildMessages.js";
 import { executeToolCall, formatToolCallAnnouncement } from "./executeToolCall.js";
 import { tools } from "./tools.js";
+import { buildPromptScaffold } from "./promptScaffold.js";
 import { logger } from "../utils/logger.js";
 import type { ChatHistoryItem } from "./types.js";
 
 export type { ChatHistoryItem } from "./types.js";
 
-// Hard ceiling on tool-call round-trips per turn. Without this, a model that
-// keeps calling tools without ever producing a final answer would spin until
-// the overall response timeout aborts the request — which the caller can
-// only report as a generic "couldn't reach the provider" failure. Stopping
-// here instead lets the agent fail with an actual explanation.
+// Each agent turn that calls tools costs 2 node invocations (agent + tools).
+// Allowing MAX_AGENT_STEPS full tool-calling cycles plus one final no-tool
+// answer gives MAX_AGENT_STEPS * 2 + 1 total invocations before the graph
+// raises GraphRecursionError.
 const MAX_AGENT_STEPS = 8;
 const RESPONSE_TIMEOUT_MS = 60_000;
 
@@ -24,74 +25,72 @@ export interface RunAgentParams {
   onToken: (token: string) => void;
 }
 
-/**
- * Runs one agent turn: builds the message list, lets the model call tools
- * across as many steps as it needs (each step: model decides, tools run,
- * results feed back in), then returns the final text answer.
- *
- * Every step streams rather than invokes-then-streams: a non-streaming
- * `invoke()` followed by a `stream()` of the same messages would cost two
- * full model calls for the (common) case where the model answers without
- * calling a tool. Streaming unconditionally costs exactly one call per step
- * regardless of which case it turns out to be.
- */
 export async function runAgent(params: RunAgentParams): Promise<string> {
-  const model = bindToolCalling(buildChatModel(params.config));
-  const messages = await buildMessages(params.systemPrompt, params.history);
+  const llm = buildChatModel(params.config);
+  if (!llm.bindTools) throw new Error("This model does not support tool calling");
+  const model = llm.bindTools(tools);
+
+  const systemPrompt = buildPromptScaffold(params.systemPrompt);
+  const initialMessages = await buildMessages(systemPrompt, params.history);
   const signal = AbortSignal.timeout(RESPONSE_TIMEOUT_MS);
 
-  for (let step = 0; step < MAX_AGENT_STEPS; step++) {
-    const response = await streamStep(model, messages, signal, params.onToken);
-
-    if (!response.tool_calls || response.tool_calls.length === 0) {
-      return contentToText(response.content);
+  // Agent node: streams the model response token-by-token via onToken, then
+  // returns the accumulated message for the graph state.
+  async function agentNode(
+    state: typeof MessagesAnnotation.State
+  ): Promise<Partial<typeof MessagesAnnotation.State>> {
+    const stream = await model.stream(state.messages, { signal });
+    let accumulated: AIMessageChunk | undefined;
+    for await (const chunk of stream) {
+      accumulated = accumulated ? accumulated.concat(chunk) : chunk;
+      const token = contentToText(chunk.content);
+      if (token) params.onToken(token);
     }
+    if (!accumulated) throw new Error("Model returned an empty response stream");
+    return { messages: [accumulated] };
+  }
 
-    messages.push(response);
-    for (const toolCall of response.tool_calls) {
+  // Tools node: announces each tool call to the token stream, executes it,
+  // and returns the ToolMessages for the graph state.
+  async function toolsNode(
+    state: typeof MessagesAnnotation.State
+  ): Promise<Partial<typeof MessagesAnnotation.State>> {
+    const last = state.messages[state.messages.length - 1] as AIMessage;
+    const toolMessages: BaseMessage[] = [];
+    for (const toolCall of last.tool_calls ?? []) {
       params.onToken(formatToolCallAnnouncement(toolCall));
-      messages.push(await executeToolCall(toolCall));
+      toolMessages.push(await executeToolCall(toolCall));
     }
+    return { messages: toolMessages };
   }
 
-  logger.warn({ steps: MAX_AGENT_STEPS }, "agent hit max steps without a final answer");
-  return "I made several tool calls but couldn't reach a final answer in time. Try rephrasing your request.";
-}
-
-type ToolCallingModel = ReturnType<NonNullable<BaseChatModel["bindTools"]>>;
-
-function bindToolCalling(model: BaseChatModel): ToolCallingModel {
-  if (!model.bindTools) {
-    throw new Error("This model does not support tool calling");
+  function shouldContinue(state: typeof MessagesAnnotation.State): "tools" | typeof END {
+    const last = state.messages[state.messages.length - 1] as AIMessage;
+    return last.tool_calls && last.tool_calls.length > 0 ? "tools" : END;
   }
-  return model.bindTools(tools);
-}
 
-/**
- * Streams one model turn and accumulates the chunks into a single message.
- * Tool-call arguments arrive as partial JSON fragments across chunks and
- * only resolve into a usable `.tool_calls` array once concatenated, so
- * whether this step ends in a tool call or a final answer isn't known until
- * the stream ends either way — tokens are still forwarded live as they
- * arrive so the UI doesn't wait for the whole response to render anything.
- */
-async function streamStep(
-  model: ToolCallingModel,
-  messages: BaseMessage[],
-  signal: AbortSignal,
-  onToken: (token: string) => void
-): Promise<AIMessageChunk> {
-  const stream = await model.stream(messages, { signal });
-  let accumulated: AIMessageChunk | undefined;
-  for await (const chunk of stream) {
-    accumulated = accumulated ? accumulated.concat(chunk) : chunk;
-    const token = contentToText(chunk.content);
-    if (token) onToken(token);
+  const graph = new StateGraph(MessagesAnnotation)
+    .addNode("agent", agentNode)
+    .addNode("tools", toolsNode)
+    .addEdge(START, "agent")
+    .addConditionalEdges("agent", shouldContinue)
+    .addEdge("tools", "agent")
+    .compile();
+
+  try {
+    const finalState = await graph.invoke(
+      { messages: initialMessages },
+      { recursionLimit: MAX_AGENT_STEPS * 2 + 1 }
+    );
+    const lastMessage = finalState.messages[finalState.messages.length - 1];
+    return contentToText(lastMessage.content);
+  } catch (err) {
+    if (err instanceof GraphRecursionError) {
+      logger.warn({ steps: MAX_AGENT_STEPS }, "agent hit max steps without a final answer");
+      return "I made several tool calls but couldn't reach a final answer in time. Try rephrasing your request.";
+    }
+    throw err;
   }
-  if (!accumulated) {
-    throw new Error("Model returned an empty response stream");
-  }
-  return accumulated;
 }
 
 function contentToText(content: MessageContent): string {
