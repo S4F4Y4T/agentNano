@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  Brain,
   Check,
   Clock,
   MessageSquare,
@@ -42,6 +43,7 @@ import {
 const NAV_ITEMS = [
   { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/tasks", label: "Scheduled tasks", icon: Clock },
+  { href: "/memory", label: "Memory", icon: Brain },
   { href: "/configure", label: "Configure", icon: Settings },
 ];
 

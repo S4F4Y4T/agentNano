@@ -17,6 +17,7 @@ import type {
   ScheduledTask,
   ScheduledTaskType,
   Session,
+  UserMemory,
 } from "./types";
 import { api, ApiError } from "./api";
 import { genId } from "./id";
@@ -64,6 +65,12 @@ interface AppDataContextValue {
   scheduledTasksLoaded: boolean;
   loadScheduledTasks: () => Promise<void>;
   cancelScheduledTask: (id: string, type: ScheduledTaskType) => Promise<void>;
+
+  memories: UserMemory[];
+  memoriesLoaded: boolean;
+  loadMemories: () => Promise<void>;
+  saveMemory: (content: string) => Promise<void>;
+  deleteMemory: (id: string) => Promise<void>;
 }
 
 const AppDataContext = createContext<AppDataContextValue | null>(null);
@@ -78,6 +85,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [messagesByConversation, setMessagesByConversation] = useState<
     Record<string, Message[]>
   >({});
+  const [memories, setMemories] = useState<UserMemory[]>([]);
+  const [memoriesLoaded, setMemoriesLoaded] = useState(false);
 
   const loadedConversationIds = useRef<Set<string>>(new Set());
 
@@ -125,6 +134,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     setConversations([]);
     setConversationsLoaded(false);
     setMessagesByConversation({});
+    setMemories([]);
+    setMemoriesLoaded(false);
     loadedConversationIds.current = new Set();
     api.post("/auth/logout").catch(() => {});
   }, []);
@@ -214,6 +225,27 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const cancelScheduledTask = useCallback(async (id: string, type: ScheduledTaskType) => {
     await api.delete(`/scheduled-tasks/${id}?type=${type}`);
     setScheduledTasks((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const loadMemories = useCallback(async () => {
+    try {
+      const res = await api.get<{ memories: UserMemory[] }>("/memories");
+      setMemories(res.memories);
+    } catch {
+      setMemories([]);
+    } finally {
+      setMemoriesLoaded(true);
+    }
+  }, []);
+
+  const saveMemory = useCallback(async (content: string) => {
+    const res = await api.post<{ memory: UserMemory }>("/memories", { content });
+    setMemories((prev) => [res.memory, ...prev]);
+  }, []);
+
+  const deleteMemory = useCallback(async (id: string) => {
+    await api.delete(`/memories/${id}`);
+    setMemories((prev) => prev.filter((m) => m.id !== id));
   }, []);
 
   const uploadAttachment = useCallback(
@@ -337,6 +369,11 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         scheduledTasksLoaded,
         loadScheduledTasks,
         cancelScheduledTask,
+        memories,
+        memoriesLoaded,
+        loadMemories,
+        saveMemory,
+        deleteMemory,
       }}
     >
       {children}

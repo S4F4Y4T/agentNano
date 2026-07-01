@@ -30,7 +30,7 @@ export async function runAgent(params: RunAgentParams): Promise<string> {
   if (!llm.bindTools) throw new Error("This model does not support tool calling");
   const model = llm.bindTools(tools);
 
-  const systemPrompt = buildPromptScaffold(params.systemPrompt);
+  const systemPrompt = await buildPromptScaffold(params.systemPrompt);
   const initialMessages = await buildMessages(systemPrompt, params.history);
   const signal = AbortSignal.timeout(RESPONSE_TIMEOUT_MS);
 

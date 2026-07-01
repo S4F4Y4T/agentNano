@@ -48,6 +48,7 @@ Prepends a structured system scaffold to the user's custom system prompt. This e
 1. **Planning**: Requires the agent to invoke the `update_plan` tool before beginning complex workflows.
 2. **Iterative updates**: Requires updating the plan's status checkboxes (`pending`, `in_progress`, `done`) step-by-step.
 3. **Sandbox filesystem usage**: Instructs the agent to utilize its private scoped directory to store intermediate results, drafts, and notes.
+4. **Persistent User Memory**: Automatically checks for any persistent memories saved for the current user and formats them into the system prompt. This informs the model of user preferences (like programming language or working directories) across all chat sessions.
 
 ---
 
@@ -109,11 +110,16 @@ The agent binds multiple tools:
    - Gives the LLM read/write access to the conversation sandbox.
    - Uses `resolveSandboxPath` to prevent path traversal attacks (preventing the model from accessing folders like `/etc`, `/var`, or files outside the active sandbox).
 
-3. **Background scheduler (`schedule_command`)**:
+3. **Background scheduler (`schedule_command`, `list_scheduled_tasks`, `cancel_scheduled_task`)**:
    - Schedules background system commands to execute on the host machine.
    - Pushes jobs to BullMQ (Redis-backed queue), allowing delayed or recurring (cron-based) execution.
 
-4. **Information Helpers**:
+4. **Persistent User Memory (`save_memory`, `delete_memory`)**:
+   - **`save_memory`**: Enters a new preference or fact about the user (e.g. name, directory settings, development framework) into the `Memory` database collection.
+   - **`delete_memory`**: Deletes a specific memory from the database using its ID so it will not be injected into future turns.
+   - *Note*: Users can also view, add, and delete these memories manually via the **Memory** management dashboard on the frontend (`/memory`).
+
+5. **Information Helpers**:
    - `get_time`: Returns current system date and time.
    - `get_weather`: Contacts `wttr.in` for live weather reports.
    - `web_search`: Queries DuckDuckGo and parses HTML to extract top snippet results.

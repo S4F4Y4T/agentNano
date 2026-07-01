@@ -4,6 +4,7 @@ import { scheduleCronCommand, scheduleOnceCommand, listScheduledTasks, cancelSch
 import { requestContext } from "../utils/context.js";
 import { sandboxTools } from "./sandboxTools.js";
 import { updatePlanTool } from "./planningTool.js";
+import { Memory } from "../db/models/Memory.js";
 
 export const weatherTool = tool(
   async ({ location }) => {
@@ -158,6 +159,53 @@ export const cancelScheduledTaskTool = tool(
   }
 );
 
+export const saveMemoryTool = tool(
+  async ({ content }) => {
+    const ctx = requestContext.getStore();
+    if (!ctx || !ctx.userId) {
+      return "Error: Could not determine active user context.";
+    }
+    try {
+      const memory = await Memory.create({ userId: ctx.userId, content });
+      return `Memory successfully saved: "${content}" (ID: ${memory._id})`;
+    } catch (err: any) {
+      return `Failed to save memory: ${err.message || err}`;
+    }
+  },
+  {
+    name: "save_memory",
+    description: "Save a new long-term fact or preference about the user so you remember it in future conversations.",
+    schema: z.object({
+      content: z.string().describe("The memory content to save (e.g. 'User prefers Next.js for web projects')"),
+    }),
+  }
+);
+
+export const deleteMemoryTool = tool(
+  async ({ id }) => {
+    const ctx = requestContext.getStore();
+    if (!ctx || !ctx.userId) {
+      return "Error: Could not determine active user context.";
+    }
+    try {
+      const res = await Memory.deleteOne({ _id: id, userId: ctx.userId });
+      if (res.deletedCount === 0) {
+        return `Error: Memory with ID ${id} not found or not owned by you.`;
+      }
+      return `Memory with ID ${id} successfully deleted.`;
+    } catch (err: any) {
+      return `Failed to delete memory: ${err.message || err}`;
+    }
+  },
+  {
+    name: "delete_memory",
+    description: "Delete a specific memory by its ID. Use the IDs shown in your system prompt memory block.",
+    schema: z.object({
+      id: z.string().describe("The memory database ID to delete"),
+    }),
+  }
+);
+
 export const tools: StructuredToolInterface[] = [
   updatePlanTool,
   ...sandboxTools,
@@ -168,4 +216,6 @@ export const tools: StructuredToolInterface[] = [
   scheduleCommandTool,
   listScheduledTasksTool,
   cancelScheduledTaskTool,
+  saveMemoryTool,
+  deleteMemoryTool,
 ];

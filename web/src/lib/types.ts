@@ -71,3 +71,9 @@ export interface ScheduledTask {
   conversationTitle: string;
   nextRunAt?: string;
 }
+
+export interface UserMemory {
+  id: string;
+  content: string;
+  createdAt: string;
+}

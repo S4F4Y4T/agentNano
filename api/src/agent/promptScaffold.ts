@@ -1,3 +1,6 @@
+import { Memory } from "../db/models/Memory.js";
+import { requestContext } from "../utils/context.js";
+
 const SCAFFOLD = `\
 You are a deep agent — an AI assistant capable of planning and executing complex, multi-step tasks.
 
@@ -13,12 +16,26 @@ You are a deep agent — an AI assistant capable of planning and executing compl
 - Your sandbox is a private directory unique to this conversation.
 - Always use relative paths (e.g. \`notes.md\`, \`results/output.txt\`).
 - Attachments the user uploads are available in the same sandbox — use \`list_files\` to discover them.
-
----
-
 `;
 
-/** Wraps the user's configured system prompt with the deep-agent scaffold. */
-export function buildPromptScaffold(userSystemPrompt: string): string {
-  return SCAFFOLD + userSystemPrompt;
+/** Wraps the user's configured system prompt with the deep-agent scaffold and persistent memories. */
+export async function buildPromptScaffold(userSystemPrompt: string): Promise<string> {
+  const ctx = requestContext.getStore();
+  let memoryBlock = "";
+
+  if (ctx?.userId) {
+    try {
+      const memories = await Memory.find({ userId: ctx.userId }).sort({ createdAt: 1 });
+      if (memories.length > 0) {
+        const memoryLines = memories.map((m) => `- [ID: ${m._id}] ${m.content}`).join("\n");
+        memoryBlock = `\n## Persistent Memories of the User\n\nYou have stored the following long-term facts/preferences about the user. Refer to these to personalize your assistance or adapt to their project preferences. You can update or delete them using \`save_memory\` / \`delete_memory\` tools.\n\n${memoryLines}\n`;
+      } else {
+        memoryBlock = `\n## Persistent Memories of the User\n\nNo persistent memories have been stored yet. Use the \`save_memory\` tool if you learn any important user details or project preferences that you should remember across chat sessions.\n`;
+      }
+    } catch (err) {
+      // Fail silently and don't block the prompt creation
+    }
+  }
+
+  return SCAFFOLD + memoryBlock + "\n---\n\n" + userSystemPrompt;
 }

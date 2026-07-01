@@ -86,11 +86,12 @@ The project is structured as a monorepo containing two primary folders: `api` (t
 │   │   │   ├── tools.ts           # Tool definitions & exports
 │   │   │   └── types.ts           # Agent type declarations
 │   │   ├── config/                # Environment configuration
-│   │   ├── db/                    # Mongoose Models (User, Message, etc.)
+│   │   ├── db/                    # Mongoose Models (User, Message, Memory)
 │   │   ├── middleware/            # Fastify Middleware (authenticate)
 │   │   ├── routes/                # API Endpoints (Fastify)
 │   │   │   ├── conversations.ts   # Chat messages & SSE event streaming
-│   │   │   └── scheduled-tasks.ts # Background job control
+│   │   │   ├── scheduled-tasks.ts # Background job control
+│   │   │   └── memories.ts        # User Memory CRUD routes
 │   │   ├── services/              # Business Logic Services
 │   │   │   ├── conversation/      # sendMessage, loadRecentMessages, history
 │   │   │   └── schedule/          # BullMQ queue connection, worker setup
@@ -101,7 +102,7 @@ The project is structured as a monorepo containing two primary folders: `api` (t
 │
 └── web/                           # Next.js Frontend Client
     ├── src/
-    │   ├── app/                   # Next.js App Router (chat, configure, tasks)
+    │   ├── app/                   # Next.js App Router (chat, configure, tasks, memory)
     │   ├── components/            # UI components (dashboard, message items)
     │   └── lib/                   # API bindings & AppDataContext (state)
     ├── package.json
@@ -276,7 +277,57 @@ export async function buildAgentHistory(
 
 ---
 
-## 6. Sequence of Operations: End-to-End Traces
+## 6. Persistent Memory System
+
+To allow the agent to personalize assistance and remember context (e.g., favorite technologies, project rules, names) across chat sessions, a persistent **User Memory** system is integrated.
+
+```
+                  ┌──────────────────────┐
+                  │    User Interaction  │
+                  └──────────┬───────────┘
+                             │
+                             ▼
+                  ┌──────────────────────┐
+                  │   save_memory Tool   │
+                  └──────────┬───────────┘
+                             │ (writes to)
+                             ▼
+  ┌─────────────────────────────────────────────────────┐
+  │         MongoDB: Memory Collection (per userId)      │
+  └──────────────────────────┬──────────────────────────┘
+                             │ (read at startup of turn)
+                             ▼
+                  ┌──────────────────────┐
+                  │  buildPromptScaffold │
+                  └──────────┬───────────┘
+                             │ (injects into)
+                             ▼
+                  ┌──────────────────────┐
+                  │ Agent System Prompt  │
+                  └──────────────────────┘
+```
+
+1. **Memory Database Collection**:
+   Stored in Mongoose (`Memory` model). Each document links a `userId` to a `content` string containing the memorized fact.
+
+2. **Memory Administration Tools**:
+   * **`save_memory`**: Enters a new fact/preference into the database for the active `userId` parsed from the current request context.
+   * **`delete_memory`**: Deletes a specific memory from the database using its unique object ID.
+
+3. **Prompt Injection**:
+   Every time `runAgent` starts, the system prompt scaffold queries the Mongoose collection for any memories matching the active `userId`. If found, these are formatted and injected as a structured block:
+   ```markdown
+   ## Persistent Memories of the User
+
+   You have stored the following long-term facts/preferences about the user:
+   - [ID: 6475f3a...] User prefers TypeScript for all backend developments.
+   - [ID: 6475f3b...] User works in the /var/www/skarbol directory.
+   ```
+   This gives the model immediate visibility of long-term details at the start of every turn without needing explicit retrieval prompts.
+
+---
+
+## 7. Sequence of Operations: End-to-End Traces
 
 ### Trace A: User submits a chat message and the agent streams back
 1. **User interaction**: User types `"what is the weather in Paris?"` and clicks send.
