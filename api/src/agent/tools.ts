@@ -1,6 +1,6 @@
 import { tool, type StructuredToolInterface } from "@langchain/core/tools";
 import { z } from "zod";
-import { scheduleCronCommand, scheduleOnceCommand } from "../services/schedule/index.js";
+import { scheduleCronCommand, scheduleOnceCommand, listScheduledTasks, cancelScheduledTask } from "../services/schedule/index.js";
 import { requestContext } from "../utils/context.js";
 import { sandboxTools } from "./sandboxTools.js";
 import { updatePlanTool } from "./planningTool.js";
@@ -109,6 +109,55 @@ export const scheduleCommandTool = tool(
   }
 );
 
+export const listScheduledTasksTool = tool(
+  async () => {
+    const ctx = requestContext.getStore();
+    if (!ctx || !ctx.userId) {
+      return "Error: Could not determine active user context.";
+    }
+    try {
+      const tasks = await listScheduledTasks(ctx.userId);
+      if (tasks.length === 0) return "No scheduled tasks found.";
+      const lines = tasks.map((t) => {
+        const when = t.nextRunAt ? `next run at ${t.nextRunAt}` : "no next run";
+        const repeat = t.type === "cron" ? ` (cron: ${t.cron})` : " (one-off)";
+        return `• [${t.id}] \`${t.command}\`${repeat} — ${when}`;
+      });
+      return `Scheduled tasks:\n${lines.join("\n")}`;
+    } catch (err: any) {
+      return `Failed to list scheduled tasks: ${err.message || err}`;
+    }
+  },
+  {
+    name: "list_scheduled_tasks",
+    description: "List all scheduled tasks (both one-off and repeating cron) for the current user.",
+    schema: z.object({}),
+  }
+);
+
+export const cancelScheduledTaskTool = tool(
+  async ({ id, type }) => {
+    const ctx = requestContext.getStore();
+    if (!ctx || !ctx.userId) {
+      return "Error: Could not determine active user context.";
+    }
+    try {
+      await cancelScheduledTask(ctx.userId, id, type);
+      return `Successfully cancelled scheduled task \`${id}\`.`;
+    } catch (err: any) {
+      return `Failed to cancel scheduled task: ${err.message || err}`;
+    }
+  },
+  {
+    name: "cancel_scheduled_task",
+    description: "Cancel and remove a scheduled task by its ID. Use list_scheduled_tasks first to get the ID and type.",
+    schema: z.object({
+      id: z.string().describe("The task ID to cancel (from list_scheduled_tasks)"),
+      type: z.enum(["once", "cron"]).describe("Whether the task is a one-off ('once') or repeating ('cron')"),
+    }),
+  }
+);
+
 export const tools: StructuredToolInterface[] = [
   updatePlanTool,
   ...sandboxTools,
@@ -117,4 +166,6 @@ export const tools: StructuredToolInterface[] = [
   webSearchTool,
   jokeTool,
   scheduleCommandTool,
+  listScheduledTasksTool,
+  cancelScheduledTaskTool,
 ];
